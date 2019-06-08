@@ -22,7 +22,7 @@
 **  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-const blessed  = require("blessed")
+const blessed  = require("nblessed")
 const XTerm    = require("./blessed-xterm")
 
 const screen = blessed.screen({

@@ -24,18 +24,16 @@
 
 /*  external requirements  */
 const clone   = require("clone")
-const blessed = require("blessed")
+const blessed = require("nblessed")
 const Pty     = require("node-pty")
-const jsdom   = require("jsdom")
 
 /*  CRUEL HACK: xterm.js accesses the global "window", so we have to emulate this environment  */
-var dom = new jsdom.JSDOM()
-global.window = dom.window
-global.window.requestAnimationFrame = (cb) => setTimeout(cb, 0)
-var document = dom.window.document
+require('browser-env')();
+global.requestAnimationFrame = fn => fn();
+global.window.requestAnimationFrame = fn => fn();
 
 /*  load xterm.js  */
-const XTermJS = require("xterm")
+const { Terminal } = require("xterm")
 
 /*  the API class  */
 class XTerm extends blessed.Box {
@@ -110,7 +108,7 @@ class XTerm extends blessed.Box {
     /*  bootstrap the API class  */
     _bootstrap () {
         /*  create XTerm emulation  */
-        this.term = XTermJS({
+        this.term = new Terminal({
             cols:        this.width  - this.iwidth,
             rows:        this.height - this.iheight,
             cursorBlink: false,
@@ -129,8 +127,8 @@ class XTerm extends blessed.Box {
         }
 
         /*  monkey-patch XTerm to prevent any key handling  */
-        this.term.keyDown  = () => {}
-        this.term.keyPress = () => {}
+        this.term._keyDown  = () => {}
+        this.term._keyPress = () => {}
 
         /*  attach XTerm to Virtual DOM  */
         var container = document.createElement("div")
@@ -138,9 +136,11 @@ class XTerm extends blessed.Box {
         this.term.open(container, true)
 
         /*  pass-through title changes by application  */
-        this.term.on("title", (title) => {
-            this.title = title
-            this.emit("title", title)
+        this.term.onTitleChange((title) => {
+            if (title && title !== '') {
+                this.title = title;
+                this.emit("title", title)
+            }
         })
 
         /*  helper function to determine mouse inputs  */
@@ -357,7 +357,7 @@ class XTerm extends blessed.Box {
         for (let y = Math.max(yi, 0); y < yl; y++) {
             /*  fetch Blessed Screen and XTerm lines  */
             let sline = this.screen.lines[y]
-            let tline = this.term.lines.get(this.term.ydisp + y - yi)
+            let tline = this.term.buffer.getLine(this.term.ydisp + y - yi)
             if (!sline || !tline)
                 break
 
@@ -486,7 +486,6 @@ class XTerm extends blessed.Box {
         /*  tear down XTerm  */
         this.term.refresh = () => {}
         this.term.write("\x1b[H\x1b[J")
-        this.term.clearCursorBlinkingInterval()
         this.term.destroy()
     }
 
